@@ -1,0 +1,31 @@
+# Бинарники и артефакты сборки
+/bin/
+/build/
+*.exe
+*.out
+# скомпилированный бинарь сервера
+/rest_booking
+/server
+
+# Go
+# vendor/
+# /vendor/
+*.test
+*.prof
+coverage.out
+coverage.html
+
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+*.log
