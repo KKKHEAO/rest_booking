@@ -18,7 +18,7 @@ type Table struct {
 	Seats  int
 }
 
-// Table - бронирование столика на интервал времени [From, To].
+// Booking - бронирование столика на интервал времени [From, To].
 type Booking struct {
 	ID        string
 	TableID   string
