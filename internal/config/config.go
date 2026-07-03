@@ -27,6 +27,7 @@ func LoadConfig() (Config, error) {
 	return cfg, nil
 }
 
+// getenvOrDefault получает из переменных окружения переменную или возвращает дефолтное значение.
 func getenvOrDefault(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
