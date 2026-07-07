@@ -6,11 +6,12 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/KKKHEAO/rest_booking/internal/domain"
-	"github.com/KKKHEAO/rest_booking/internal/storage"
 )
 
 // Repository - реализация Storage interface для Postgres.
@@ -24,10 +25,28 @@ func (r *Repository) CreateBooking(ctx context.Context, b domain.Booking) (domai
 		b.ID = uuid.NewString()
 	}
 
-	if _, err := r.pool.Exec(ctx, createBooking,
+	tx, err := r.pool.Begin(ctx)
+
+	if err != nil {
+		return domain.Booking{}, fmt.Errorf("begin tx: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, lockTable, b.TableID); err != nil {
+		return domain.Booking{}, fmt.Errorf("lock table: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, createBooking,
 		b.ID, b.TableID, b.GuestName, b.Guests, b.From, b.To, b.Status,
 	); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ExclusionViolation {
+			return domain.Booking{}, domain.ErrTableTaken
+		}
 		return domain.Booking{}, fmt.Errorf("insert booking: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Booking{}, fmt.Errorf("commit tx: %w", err)
 	}
 
 	return b, nil
@@ -143,5 +162,3 @@ func (r *Repository) ListTables(ctx context.Context) ([]domain.Table, error) {
 func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
-
-var _ storage.Storage = (*Repository)(nil)

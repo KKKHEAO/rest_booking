@@ -6,16 +6,29 @@ import (
 	"time"
 
 	"github.com/KKKHEAO/rest_booking/internal/domain"
-	"github.com/KKKHEAO/rest_booking/internal/storage"
 )
 
-// Service содержит с бизнес-логикой
+// Storage — контракт хранилища, объявленный потребителем (service).
+type Storage interface {
+	// Tables
+	CreateTable(ctx context.Context, t domain.Table) (domain.Table, error)
+	GetTable(ctx context.Context, id string) (domain.Table, error)
+	ListTables(ctx context.Context) ([]domain.Table, error)
+
+	// Bookings
+	CreateBooking(ctx context.Context, b domain.Booking) (domain.Booking, error)
+	GetBooking(ctx context.Context, id string) (domain.Booking, error)
+	ListBookings(ctx context.Context) ([]domain.Booking, error)
+	UpdateBookingStatus(ctx context.Context, id string, status domain.Status) error
+}
+
+// Service содержит бизнес-логику.
 type Service struct {
-	store storage.Storage
+	store Storage
 }
 
 // NewService создаёт Service поверх переданного хранилища.
-func NewService(store storage.Storage) *Service {
+func NewService(store Storage) *Service {
 	return &Service{store: store}
 }
 
@@ -42,20 +55,6 @@ func (s *Service) CreateBooking(ctx context.Context, b domain.Booking) (domain.B
 	}
 	if b.Guests > table.Seats {
 		return domain.Booking{}, fmt.Errorf("%w: table %d has only %d seats", domain.ErrValidation, table.Number, table.Seats)
-	}
-
-	// Проверка пересечений. Пока так, потом через constraint.
-	existing, err := s.store.ListBookings(ctx)
-	if err != nil {
-		return domain.Booking{}, err
-	}
-	for _, e := range existing {
-		if e.TableID != b.TableID || e.Status != domain.StatusConfirmed {
-			continue
-		}
-		if b.Intersect(e) {
-			return domain.Booking{}, domain.ErrTableTaken
-		}
 	}
 
 	b.Status = domain.StatusConfirmed

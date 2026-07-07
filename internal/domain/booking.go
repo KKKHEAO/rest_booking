@@ -29,7 +29,8 @@ type Booking struct {
 	Status    Status
 }
 
-// Intersect - проверяет пересечение двух броней столика
+// Intersect - проверяет пересечение двух броней столика.
+// после введения constraintа в БД не нужен, кроме моковых тестов
 func (b Booking) Intersect(other Booking) bool {
 	return b.From.Before(other.To) && other.From.Before(b.To)
 }

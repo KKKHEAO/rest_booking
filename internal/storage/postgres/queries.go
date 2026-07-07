@@ -16,4 +16,5 @@ const (
 	createTable         = `INSERT INTO tables (id, number, seats) VALUES ($1, $2, $3)`
 	getTable            = `SELECT id, number, seats FROM tables WHERE id = $1`
 	getListTables       = `SELECT id, number, seats FROM tables ORDER BY number`
+	lockTable           = `SELECT id FROM tables WHERE id = $1 FOR UPDATE`
 )
