@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/KKKHEAO/rest_booking/internal/domain"
+	"github.com/KKKHEAO/rest_booking/internal/payment"
 )
 
 // Storage — контракт хранилища, объявленный потребителем (service).
@@ -22,14 +25,20 @@ type Storage interface {
 	UpdateBookingStatus(ctx context.Context, id string, status domain.Status) error
 }
 
+// PaymentCharger — контракт платёжного клиента (объявлен потребителем).
+type PaymentCharger interface {
+	Charge(ctx context.Context, req payment.ChargeRequest) (payment.ChargeResult, error)
+}
+
 // Service содержит бизнес-логику.
 type Service struct {
-	store Storage
+	store   Storage
+	payment PaymentCharger
 }
 
 // NewService создаёт Service поверх переданного хранилища.
-func NewService(store Storage) *Service {
-	return &Service{store: store}
+func NewService(store Storage, charger PaymentCharger) *Service {
+	return &Service{store: store, payment: charger}
 }
 
 // CreateBooking валидирует корректность и сохраняет бронь.
@@ -58,7 +67,34 @@ func (s *Service) CreateBooking(ctx context.Context, b domain.Booking) (domain.B
 	}
 
 	b.Status = domain.StatusConfirmed
-	return s.store.CreateBooking(ctx, b)
+
+	created, err := s.store.CreateBooking(ctx, b)
+	if err != nil {
+		return domain.Booking{}, err
+	}
+
+	// Списываем депозит. BookingID => идемпотентность (безопасный ретрай).
+	_, err = s.payment.Charge(ctx, payment.ChargeRequest{
+		BookingID: created.ID,
+		Amount:    depositAmount(created.Guests),
+		Currency:  "RUB",
+	})
+	if err != nil {
+		// Компенсация: платёж не прошёл — откатываем бронь в cancelled.
+		if cancelErr := s.store.UpdateBookingStatus(ctx, created.ID, domain.StatusCancelled); cancelErr != nil {
+			slog.ErrorContext(ctx, "compensation failed",
+				"booking_id", created.ID, "error", cancelErr)
+		}
+		// Переводим ошибку платёжки в доменную.
+		switch {
+		case errors.Is(err, payment.ErrDeclined):
+			return domain.Booking{}, fmt.Errorf("%w: %w", domain.ErrPaymentDeclined, err)
+		default:
+			return domain.Booking{}, fmt.Errorf("%w: %w", domain.ErrPaymentUnavailable, err)
+		}
+	}
+
+	return created, nil
 }
 
 // CreateTable валидирует и создаёт стол.
@@ -96,4 +132,9 @@ func (s *Service) ListBookings(ctx context.Context) ([]domain.Booking, error) {
 // CancelBooking изменяет статус брони на cancelled.
 func (s *Service) CancelBooking(ctx context.Context, id string) error {
 	return s.store.UpdateBookingStatus(ctx, id, domain.StatusCancelled)
+}
+
+// depositAmount — хелпер размер депозита в копейках: 500 ₽ за гостя.
+func depositAmount(guests int) int {
+	return guests * 500 * 100
 }

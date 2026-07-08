@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -12,7 +13,7 @@ type Config struct {
 	DatabaseURL string
 	LogLevel    string
 
-	paymentBaseURL string
+	PaymentBaseURL string
 	PaymentTimeout time.Duration
 	PaymentRetries int
 }
@@ -20,17 +21,17 @@ type Config struct {
 // LoadConfig загружаем конфиг из переменных окружения. Ошибка если нет обязательного поля.
 func LoadConfig() (Config, error) {
 	cfg := Config{
-		HTTPAddr:    getenvOrDefault("HTTP_ADDR", ":8080"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		LogLevel:    getenvOrDefault("LOG_LEVEL", "info"),
+		HTTPAddr:       getenvOrDefault("HTTP_ADDR", ":8080"),
+		DatabaseURL:    os.Getenv("DATABASE_URL"),
+		LogLevel:       getenvOrDefault("LOG_LEVEL", "info"),
+		PaymentBaseURL: os.Getenv("PAYMENT_BASE_URL"),
 	}
 
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")
 	}
 
-	cfg.paymentBaseURL = os.Getenv("PAYMENT_BASE_URL")
-	if cfg.paymentBaseURL = "" {
+	if cfg.PaymentBaseURL == "" {
 		return Config{}, fmt.Errorf("PAYMENT_BASE_URL is required")
 	}
 

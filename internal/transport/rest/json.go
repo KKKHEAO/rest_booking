@@ -38,6 +38,11 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
 	case errors.Is(err, domain.ErrTableTaken):
 		writeJSON(w, http.StatusConflict, errorResponse{Error: err.Error()})
+	case errors.Is(err, domain.ErrPaymentDeclined):
+		writeJSON(w, http.StatusPaymentRequired, errorResponse{Error: err.Error()}) // 402
+	case errors.Is(err, domain.ErrPaymentUnavailable):
+		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "payment service unavailable"}) // 503
+
 	default:
 		// неизвестную ошибку клиенту НЕ показываем — только логируем
 		slog.ErrorContext(r.Context(), "unhandled error", "error", err)

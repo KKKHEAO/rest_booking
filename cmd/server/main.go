@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/KKKHEAO/rest_booking/internal/config"
+	"github.com/KKKHEAO/rest_booking/internal/payment"
 	"github.com/KKKHEAO/rest_booking/internal/service"
 	"github.com/KKKHEAO/rest_booking/internal/storage/postgres"
 	"github.com/KKKHEAO/rest_booking/internal/transport/rest"
@@ -44,7 +45,14 @@ func run() error {
 	defer pool.Close()
 
 	repo := postgres.NewRepository(pool)
-	svc := service.NewService(repo)
+
+	payClient := payment.NewClient(payment.Config{
+		BaseURL:    cfg.PaymentBaseURL,
+		Timeout:    cfg.PaymentTimeout,
+		MaxRetries: cfg.PaymentRetries,
+	})
+
+	svc := service.NewService(repo, payClient)
 	handler := rest.NewRouter(svc, logger)
 
 	srv := &http.Server{
