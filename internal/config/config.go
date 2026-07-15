@@ -9,13 +9,16 @@ import (
 
 // Config - конфиг приложения.
 type Config struct {
+	// Сервер
 	HTTPAddr    string
 	DatabaseURL string
 	LogLevel    string
-
+	// Платежка
 	PaymentBaseURL string
 	PaymentTimeout time.Duration
 	PaymentRetries int
+	// Телеметрия
+	OTLPEndpoint string
 }
 
 // LoadConfig загружаем конфиг из переменных окружения. Ошибка если нет обязательного поля.
@@ -25,6 +28,7 @@ func LoadConfig() (Config, error) {
 		DatabaseURL:    os.Getenv("DATABASE_URL"),
 		LogLevel:       getenvOrDefault("LOG_LEVEL", "info"),
 		PaymentBaseURL: os.Getenv("PAYMENT_BASE_URL"),
+		OTLPEndpoint:   os.Getenv("OTLP_ENDPOINT"),
 	}
 
 	if cfg.DatabaseURL == "" {

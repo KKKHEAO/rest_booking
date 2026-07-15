@@ -12,10 +12,12 @@ import (
 	"time"
 
 	"github.com/KKKHEAO/rest_booking/internal/config"
+	"github.com/KKKHEAO/rest_booking/internal/observability"
 	"github.com/KKKHEAO/rest_booking/internal/payment"
 	"github.com/KKKHEAO/rest_booking/internal/service"
 	"github.com/KKKHEAO/rest_booking/internal/storage/postgres"
 	"github.com/KKKHEAO/rest_booking/internal/transport/rest"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
@@ -37,6 +39,18 @@ func run() error {
 	// Контекст, который отменяется по SIGINT/SIGTERM — сигнал к остановке.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	// Инициализируем трейсер
+	shutdownTracer, err := observability.InitTracer(ctx, "rest_booking", cfg.OTLPEndpoint)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownTracer(shutdownCtx); err != nil {
+			logger.Error("tracer shutdown", "error", err)
+		}
+	}()
 
 	pool, err := postgres.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -54,6 +68,10 @@ func run() error {
 
 	svc := service.NewService(repo, payClient)
 	handler := rest.NewRouter(svc, logger)
+	// Обернем хэндлер
+	handler = otelhttp.NewHandler(handler, "http", otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
+		return r.Method + " " + r.URL.Path
+	}))
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
