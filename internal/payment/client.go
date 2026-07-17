@@ -9,6 +9,8 @@ import (
 	"math/rand"
 	"net/http"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // Доменные ошибки платежного клиента. Используем только в этом пакете.
@@ -38,7 +40,7 @@ type Client struct {
 // NewClient - создает клиент.
 func NewClient(cfg Config) *Client {
 	return &Client{
-		http: &http.Client{Timeout: cfg.Timeout},
+		http: &http.Client{Timeout: cfg.Timeout, Transport: otelhttp.NewTransport(http.DefaultTransport)},
 		cfg:  cfg,
 	}
 }
